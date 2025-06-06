@@ -9,9 +9,9 @@ lightmap_size_hint = Vector2i(322, 322)
 [sub_resource type="MultiMesh" id="MultiMesh_112p8"]
 use_colors = true
 use_custom_data = true
-instance_count = 1
+instance_count = 3
 mesh = SubResource("QuadMesh_j2q8x")
-buffer = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+buffer = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3.57628e-07, 0, 0, 0, 1.4013e-45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -4.88836e+06, 4.58225e-43, -3.19146e+14, 4.58225e-43, 0, 0, 0, 0, 0, 0, 0, 0)
 
 [sub_resource type="Gradient" id="Gradient_j2q8x"]
 offsets = PackedFloat32Array(1)
