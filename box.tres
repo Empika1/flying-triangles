@@ -4,6 +4,6 @@
 
 [resource]
 shader = ExtResource("1_gdrfk")
-shader_parameter/borderWidthGlobal = 8.0
-shader_parameter/cornerRadiusGlobal = 4.0
-shader_parameter/colorsGlobal = PackedVector4Array(0, 0.502, 0.035, 0.5, 0, 0.745, 0.004, 0.5, 0.776, 0.337, 0.047, 0.5, 0.976, 0.855, 0.184, 0.5, 0.733, 0.4, 0.4, 0.5, 1, 0.4, 0.4, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/colorsGlobal = PackedVector4Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/cornerRadiiGlobal = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0)
+shader_parameter/borderThicknessesGlobal = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)

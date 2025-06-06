@@ -1,8 +1,9 @@
 shader_type canvas_item;
 
-uniform float borderWidthGlobal;
-uniform float cornerRadiusGlobal;
-uniform vec4[16] colorsGlobal;
+uniform vec4[32] colorsGlobal;
+uniform float[7] cornerRadiiGlobal;
+uniform float[16] borderThicknessesGlobal;
+instance uniform float scale;
 
 vec4 premult_mix(vec4 color1, vec4 color2, float t) {
     vec3 premul1 = color1.rgb * color1.a;
@@ -23,33 +24,41 @@ float box(vec2 position, vec2 halfSize, float cornerRadius) {
 
 varying vec4 customData;
 void vertex() {
-	customData = INSTANCE_CUSTOM;
+    customData = INSTANCE_CUSTOM;
 }
 
 void fragment() {
-	vec4 customColor = COLOR;
-	vec2 meshSize = vec2(customColor[0], customColor[1]);
-	vec2 rectSize = vec2(customColor[2], customColor[3]);
-	vec2 rectCenter = vec2(customData[0], customData[1]);
-	int insideColorIndex = int(customData[2]) / 256;
-	int borderColorIndex = int(customData[2]) % 256;
-	
-	vec2 pixelPos = meshSize * UV;
-	//COLOR = vec4(pixelPos.x / 128., pixelPos.y / 256., 1., 1.);
-	float d = box(pixelPos - rectCenter, rectSize / 2., cornerRadiusGlobal);
-	
-	vec4 outsideColor = vec4(0);
-	vec4 borderColor = colorsGlobal[borderColorIndex];
-	vec4 insideColor = colorsGlobal[insideColorIndex];
-	if(d > 0.) {
-		COLOR = vec4(0);
-	} else if(d > -1.) {
-		COLOR = premult_mix(borderColor, outsideColor, d - -1.);
-	} else if(d > -borderWidthGlobal) {
-		COLOR = borderColor;
-	} else if(d > -borderWidthGlobal - 1.) {
-		COLOR = premult_mix(insideColor, borderColor, d - (-borderWidthGlobal - 1.));
-	} else {
-		COLOR = insideColor;
-	}
+    vec4 customColor = COLOR;
+    uint customData0 = uint(int(customData[0]) + 2048);
+    uint customData1 = uint(int(customData[1]) + 2048);
+    uint customData2 = uint(int(customData[2]) + 2048);
+    uint customData3 = uint(int(customData[3]) + 2048);
+
+    vec2 size = vec2(customColor[0], customColor[1]);
+    vec2 center = vec2(customColor[2], customColor[3]);
+    uint cornerRadiusIndex = customData0 >> 4u;
+    uint borderThicknessIndex = customData0 & 0xfu;
+    uint insideColorIndex = customData1;
+    uint borderColorIndex = customData2;
+
+    vec4 outsideColor = vec4(0);
+    vec4 borderColor = colorsGlobal[borderColorIndex];
+    vec4 insideColor = colorsGlobal[insideColorIndex];
+    float cornerRadius = cornerRadiiGlobal[cornerRadiusIndex] * scale;
+    float borderThickness = borderThicknessesGlobal[borderThicknessIndex] * scale;
+
+    vec2 pixelPos = size * UV;
+    float d = box(pixelPos - center, size / 2., cornerRadius);
+
+    if(d > 0.) {
+        COLOR = vec4(0);
+    } else if(d > -1.) {
+        COLOR = premult_mix(borderColor, outsideColor, d - -1.);
+    } else if(d > -borderThickness) {
+        COLOR = borderColor;
+    } else if(d > -borderThickness - 1.) {
+        COLOR = premult_mix(insideColor, borderColor, d - (-borderThickness - 1.));
+    } else {
+        COLOR = insideColor;
+    }
 }
