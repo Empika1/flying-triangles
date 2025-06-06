@@ -1,0 +1,9 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=4 uid="uid://c7pyjdqr3nu18"]
+
+[ext_resource type="Shader" uid="uid://d0qgtte33n6nt" path="res://box.gdshader" id="1_gdrfk"]
+
+[resource]
+shader = ExtResource("1_gdrfk")
+shader_parameter/borderWidthGlobal = 16.0
+shader_parameter/cornerRadiusGlobal = 16.0
+shader_parameter/colorsGlobal = PackedVector4Array(1, 1, 1, 1, 0.75, 0.75, 0.75, 1, 0.5, 0.5, 0.5, 1, 0.25, 0.25, 0.25, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
