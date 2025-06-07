@@ -14,12 +14,11 @@ enum colorNames {
     UPW_BORDER, UPW_INSIDE, UPW_DECAL,
     BUILD_BORDER, BUILD_INSIDE,
     GOAL_BORDER, GOAL_INSIDE,
-    JOINT_NORMAL_BORDER, JOINT_WHEEL_CENTER_BORDER, JOINT_INSIDE
+    JOINT_NORMAL_BORDER, JOINT_WHEEL_CENTER_BORDER,
+    TRANSPARENT
 }
 
-var sm: ShaderMaterial
-func setShaderMaterial() -> void:
-    sm = bgal.mmi.material as ShaderMaterial
+var sm: ShaderMaterial = load("res://box.tres")
 
 var colors: Array[Color]
 func setColors() -> void:
@@ -37,7 +36,8 @@ func setColors() -> void:
     colors[colorNames.UPW_BORDER] = Color("#0a69fd"); colors[colorNames.UPW_INSIDE] = Color("#89fae3"); colors[colorNames.CW_DECAL] = Color("#4a69fd")
     colors[colorNames.BUILD_BORDER] = Color("#7777ee"); colors[colorNames.BUILD_INSIDE] = Color("#bcdbf9")
     colors[colorNames.GOAL_BORDER] = Color("#bb6666"); colors[colorNames.GOAL_INSIDE] = Color("#f19191")
-    colors[colorNames.JOINT_NORMAL_BORDER] = Color("#838383"); colors[colorNames.JOINT_WHEEL_CENTER_BORDER] = Color("#ffffff"); colors[colorNames.JOINT_INSIDE] = Color("#00000000")
+    colors[colorNames.JOINT_NORMAL_BORDER] = Color("#838383"); colors[colorNames.JOINT_WHEEL_CENTER_BORDER] = Color("#ffffff");
+    colors[colorNames.TRANSPARENT] = Color("#00000000")
 
 func setShaderColors() -> void:
     var shaderColors: PackedVector4Array
@@ -47,7 +47,7 @@ func setShaderColors() -> void:
     sm.set_shader_parameter("colorsGlobal", shaderColors)
 
 enum cornerRadiusNames {
-    STATIC_RECT, DYNAMIC_RECT, GP_RECT, WOOD, WATER, BUILD, GOAL
+    STATIC_RECT, DYNAMIC_RECT, GP_RECT, WOOD, WATER, BUILD, GOAL, ZERO
 }
 
 var cornerRadii: Array[float]
@@ -60,6 +60,7 @@ func setCornerRadii() -> void:
     cornerRadii[cornerRadiusNames.WATER] = 1.6
     cornerRadii[cornerRadiusNames.BUILD] = 1.6
     cornerRadii[cornerRadiusNames.GOAL] = 1.6
+    cornerRadii[cornerRadiusNames.ZERO] = 0
 
 func setShaderCornerRadii() -> void:
     var shaderCornerRadii: PackedFloat32Array
@@ -75,7 +76,8 @@ enum borderThicknessNames {
     WOOD, WATER,
     CW, CCW, UPW,
     BUILD, GOAL,
-    JOINT_NORMAL, JOINT_WHEEL_CENTER
+    JOINT_NORMAL, JOINT_WHEEL_CENTER,
+    ZERO
 }
 
 var borderThicknesses: Array[float]
@@ -88,6 +90,7 @@ func setBorderThicknesses() -> void:
     borderThicknesses[borderThicknessNames.WOOD] = 2.8; borderThicknesses[borderThicknessNames.WATER] = 2.8
     borderThicknesses[borderThicknessNames.BUILD] = 4; borderThicknesses[borderThicknessNames.GOAL] = 4
     borderThicknesses[borderThicknessNames.JOINT_NORMAL] = 2; borderThicknesses[borderThicknessNames.JOINT_WHEEL_CENTER] = 2
+    borderThicknesses[borderThicknessNames.ZERO] = 0;
 
 func setShaderBorderThicknesses() -> void:
     var shaderBorderThicknesses: PackedFloat32Array
@@ -97,7 +100,6 @@ func setShaderBorderThicknesses() -> void:
     sm.set_shader_parameter("borderThicknessesGlobal", shaderBorderThicknesses)
 
 func setupVisuals() -> void:
-    setShaderMaterial()
     setColors()
     setShaderColors()
     setCornerRadii()
@@ -108,7 +110,7 @@ func setupVisuals() -> void:
 #currently can only store 2*2048+1 = 4097 values from 0 to 4096
 #TODO: update to be able to use all 65536 values
 func packIntToHalf(data: int) -> float:
-    return float(data - 2048) #ints in the range [-2048, 2048] have exact representations in a 16 bit float
+    return float(data - 2048) # ints in the range [-2048, 2048] have exact representations in a 16 bit float
 
 # data layout:
 # 96 bytes to work with (6*16 bit floats)
@@ -158,6 +160,9 @@ class RenderLayer extends RefCounted:
         borderColorIndices[renderSpot] = borderColorIndex
         renderSpot += 1
 
+    func addRenderObjectTransformed(size: Vector2, rotation: float, pos: Vector2, center: Vector2, cornerRadiusIndex: int, borderThicknessIndex: int, insideColorIndex: int, borderColorIndex: int) -> void:
+        addRenderObject(size * outer.scale, rotation, pos * outer.scale + outer.shift, center * outer.scale, cornerRadiusIndex, borderThicknessIndex, insideColorIndex, borderColorIndex)
+
     func resetRenderObjects() -> void:
         renderSpot = 0
 
@@ -166,6 +171,8 @@ class RenderLayer extends RefCounted:
         packedColors.resize(2)
 
     func render() -> void:
+        mmi.set_instance_shader_parameter("scale", outer.scale)
+        mmi.multimesh.visible_instance_count = renderSpot
         for i in range(renderSpot):
             var transform_ := Transform2D()
             transform_ = transform_.rotated_local(rotations[i])
@@ -177,20 +184,48 @@ class RenderLayer extends RefCounted:
             mmi.multimesh.set_instance_color(i, packedColors[0])
             mmi.multimesh.set_instance_custom_data(i, packedColors[1])
 
-@onready var bgal = RenderLayer.new($BuildGoalAreaLayer, self)
-@onready var ol = RenderLayer.new($OutlineLayer, self)
-@onready var iajl = RenderLayer.new($InsideAndJointLayer, self)
+@onready var bgal: RenderLayer = RenderLayer.new($BuildGoalAreaLayer, self)
+@onready var bl: RenderLayer = RenderLayer.new($BorderLayer, self)
+@onready var iajl: RenderLayer = RenderLayer.new($InsideAndJointLayer, self)
+
+var scale: float = 1
+var shift: Vector2 = Vector2(0, 0)
+func zoom(deltaScale: float, screen_pos: Vector2):
+    var old_scale = scale
+    scale *= deltaScale
+    shift -= (screen_pos - shift) * (scale / old_scale - 1)
+
+func resetRenderObjects() -> void:
+    bgal.resetRenderObjects()
+    bl.resetRenderObjects()
+    iajl.resetRenderObjects()
+
+func addRoundedRectWithBorder(size: Vector2, rotation: float, pos: Vector2, center: Vector2, cornerRadiusIndex: int, borderThicknessIndex: int, insideColorIndex: int, borderColorIndex: int) -> void:
+    bgal.addRenderObjectTransformed(size, rotation, pos, center, cornerRadiusIndex, borderThicknessIndex, borderColorIndex, borderColorIndex)
+    var borderOffset = Vector2(borderThicknesses[borderThicknessIndex], borderThicknesses[borderThicknessIndex])
+    bl.addRenderObjectTransformed(size - 2 * borderOffset,
+        rotation, pos, center - borderOffset, cornerRadiusNames.ZERO, borderThicknessNames.ZERO, insideColorIndex, insideColorIndex)
+
 
 func _ready() -> void:
     setupVisuals()
 
-var packedColors: Array[Color] = [Color(), Color()] # allocated once, used in process
-func _process(_delta: float) -> void:
-    bgal.resetRenderObjects()
-    bgal.addRenderObject(Vector2(128, 256), 1, Vector2(640, 360), Vector2(64, 128), cornerRadiusNames.BUILD, borderThicknessNames.BUILD, colorNames.BUILD_INSIDE, colorNames.BUILD_BORDER)
-
-    ol.addRenderObject(Vector2(256, 126), 1, Vector2(640, 360), Vector2(128, 64), cornerRadiusNames.WOOD, borderThicknessNames.WOOD, colorNames.WOOD_INSIDE, colorNames.WOOD_BORDER)
+var angle = 0
+func _process(delta: float) -> void:
+    resetRenderObjects()
+    addRoundedRectWithBorder(Vector2(128, 256), angle, Vector2(640, 360), Vector2(64, 128), cornerRadiusNames.BUILD, borderThicknessNames.BUILD, colorNames.BUILD_INSIDE, colorNames.BUILD_BORDER)
+    addRoundedRectWithBorder(Vector2(256, 128), angle, Vector2(640, 360), Vector2(128, 64), cornerRadiusNames.WOOD, borderThicknessNames.WOOD, colorNames.WOOD_INSIDE, colorNames.WOOD_BORDER)
 
     bgal.render()
-    ol.render()
-    #iajl.render()
+    bl.render()
+    iajl.render()
+
+    angle += delta * 0.1
+
+func _unhandled_input(event):
+    if event is InputEventKey && event.pressed:
+        if event.keycode == KEY_I:
+            zoom(1.1, get_viewport().get_mouse_position())
+        elif event.keycode == KEY_O:
+            zoom(1. / 1.1, get_viewport().get_mouse_position())
+        print(scale)

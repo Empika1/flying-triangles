@@ -1,8 +1,8 @@
 shader_type canvas_item;
 
-uniform vec4[32] colorsGlobal;
-uniform float[7] cornerRadiiGlobal;
-uniform float[16] borderThicknessesGlobal;
+uniform vec4[33] colorsGlobal;
+uniform float[8] cornerRadiiGlobal;
+uniform float[17] borderThicknessesGlobal;
 instance uniform float scale;
 
 vec4 premult_mix(vec4 color1, vec4 color2, float t) {
