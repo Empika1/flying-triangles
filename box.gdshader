@@ -32,14 +32,14 @@ void fragment() {
     uint customData0 = uint(int(customData[0]) + 2048);
     uint customData1 = uint(int(customData[1]) + 2048);
     uint customData2 = uint(int(customData[2]) + 2048);
-    //uint customData3 = uint(int(customData[3]) + 2048);
+    uint customData3 = uint(int(customData[3]) + 2048);
 
     vec2 size = vec2(customColor[0], customColor[1]);
     vec2 center = vec2(customColor[2], customColor[3]);
-    uint cornerRadiusIndex = customData0 >> 4u;
-    uint borderThicknessIndex = customData0 & 0xfu;
-    uint insideColorIndex = customData1;
-    uint borderColorIndex = customData2;
+    uint cornerRadiusIndex = customData0;
+    uint borderThicknessIndex = customData1;
+    uint insideColorIndex = customData2;
+    uint borderColorIndex = customData3;
 
     vec4 outsideColor = vec4(0);
     vec4 borderColor = colorsGlobal[borderColorIndex];
@@ -61,4 +61,6 @@ void fragment() {
     } else {
         COLOR = insideColor;
     }
+
+    // COLOR = vec4(float(cornerRadiusIndex) / 10000., 0., 0., 1.);
 }
