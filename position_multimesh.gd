@@ -1,4 +1,4 @@
-extends MultiMeshInstance2D
+extends Node
 
 enum colorNames {
     STATIC_RECT_BORDER, STATIC_RECT_INSIDE,
@@ -19,7 +19,7 @@ enum colorNames {
 
 var sm: ShaderMaterial
 func setShaderMaterial() -> void:
-    sm = material as ShaderMaterial
+    sm = bgal.mmi.material as ShaderMaterial
 
 var colors: Array[Color]
 func setColors() -> void:
@@ -108,7 +108,7 @@ func setupVisuals() -> void:
 #currently can only store 2*2048+1 = 4097 values from 0 to 4096
 #TODO: update to be able to use all 65536 values
 func packIntToHalf(data: int) -> float:
-    return float(data - 2048)
+    return float(data - 2048) #ints in the range [-2048, 2048] have exact representations in a 16 bit float
 
 # data layout:
 # 96 bytes to work with (6*16 bit floats)
@@ -117,45 +117,89 @@ func packDataToColors(size: Vector2, center: Vector2, cornerRadiusIndex: int, bo
     out[0] = Color(size.x, size.y, center.x, center.y);
     out[1] = Color(packIntToHalf(cornerRadiusIndex << 4 + borderThicknessIndex), packIntToHalf(insideColorIndex), packIntToHalf(borderColorIndex), 0);
 
-var sizes: Array[Vector2]
-var rotations: Array[float]
-var poses: Array[Vector2]
-var centers: Array[Vector2]
-var cornerRadiusIndices: Array[int]
-var borderThicknessIndices: Array[int]
-var insideColorIndices: Array[int]
-var borderColorIndices: Array[int]
-var packedColors: Array[Color] = [Color(), Color()] # allocated once, used in process
+#render data
+class RenderLayer extends RefCounted:
+    var outer
+
+    var mmi: MultiMeshInstance2D
+    var sizes: Array[Vector2]
+    var rotations: Array[float]
+    var poses: Array[Vector2]
+    var centers: Array[Vector2]
+    var cornerRadiusIndices: Array[int]
+    var borderThicknessIndices: Array[int]
+    var insideColorIndices: Array[int]
+    var borderColorIndices: Array[int]
+    var visibleCount: int = 0
+
+    func _init(mmi_: MultiMeshInstance2D, outer_) -> void:
+        outer = outer_
+        mmi = mmi_
+        var count = mmi.multimesh.instance_count
+        sizes.resize(count)
+        rotations.resize(count)
+        poses.resize(count)
+        centers.resize(count)
+        cornerRadiusIndices.resize(count)
+        borderThicknessIndices.resize(count)
+        insideColorIndices.resize(count)
+        borderColorIndices.resize(count)
+
+    static var packedColors: Array[Color]
+    static func _static_init() -> void:
+        packedColors.resize(2)
+
+    func render() -> void:
+        for i in range(mmi.multimesh.instance_count):
+            var transform_ := Transform2D()
+            transform_ = transform_.rotated_local(rotations[i])
+            transform_ = transform_.scaled_local(sizes[i])
+            transform_.origin = poses[i]
+            mmi.multimesh.set_instance_transform_2d(i, transform_)
+
+            outer.packDataToColors(sizes[i], centers[i], cornerRadiusIndices[i], borderThicknessIndices[i], insideColorIndices[i], borderColorIndices[i], packedColors)
+            mmi.multimesh.set_instance_color(i, packedColors[0])
+            mmi.multimesh.set_instance_custom_data(i, packedColors[1])
+
+@onready var bgal = RenderLayer.new($BuildGoalAreaLayer, self)
+@onready var ol = RenderLayer.new($OutlineLayer, self)
+@onready var iajl = RenderLayer.new($InsideAndJointLayer, self)
 
 func _ready() -> void:
     setupVisuals()
-    sizes.resize(multimesh.instance_count);
-    rotations.resize(multimesh.instance_count);
-    poses.resize(multimesh.instance_count);
-    centers.resize(multimesh.instance_count);
-    cornerRadiusIndices.resize(multimesh.instance_count);
-    borderThicknessIndices.resize(multimesh.instance_count);
-    insideColorIndices.resize(multimesh.instance_count);
-    borderColorIndices.resize(multimesh.instance_count);
 
+var packedColors: Array[Color] = [Color(), Color()] # allocated once, used in process
 func _process(_delta: float) -> void:
-    for i in range(multimesh.instance_count):
-        sizes[i] = Vector2(128, 256)
-        rotations[i] = 1
-        poses[i] = Vector2(640, 360)
-        centers[i] = Vector2(64, 128)
-        cornerRadiusIndices[i] = cornerRadiusNames.BUILD
-        borderThicknessIndices[i] = borderThicknessNames.BUILD
-        insideColorIndices[i] = colorNames.BUILD_INSIDE
-        borderColorIndices[i] = colorNames.BUILD_BORDER
+    for i in range(bgal.mmi.multimesh.instance_count):
+        bgal.sizes[i] = Vector2(128, 256)
+        bgal.rotations[i] = 1
+        bgal.poses[i] = Vector2(640, 360)
+        bgal.centers[i] = Vector2(64, 128)
+        bgal.cornerRadiusIndices[i] = 0
+        bgal.borderThicknessIndices[i] = borderThicknessNames.BUILD
+        bgal.insideColorIndices[i] = colorNames.BUILD_INSIDE
+        bgal.borderColorIndices[i] = colorNames.BUILD_BORDER
 
-    for i in range(multimesh.instance_count):
-        var transform_ := Transform2D()
-        transform_ = transform_.rotated_local(rotations[i])
-        transform_ = transform_.scaled_local(sizes[i])
-        transform_.origin = poses[i]
-        multimesh.set_instance_transform_2d(i, transform_)
+    for i in range(ol.mmi.multimesh.instance_count):
+        ol.sizes[i] = Vector2(256, 128)
+        ol.rotations[i] = 1
+        ol.poses[i] = Vector2(640, 360)
+        ol.centers[i] = Vector2(128, 64)
+        ol.cornerRadiusIndices[i] = 0
+        ol.borderThicknessIndices[i] = borderThicknessNames.BUILD
+        ol.insideColorIndices[i] = colorNames.GOAL_INSIDE
+        ol.borderColorIndices[i] = colorNames.GOAL_BORDER
 
-        packDataToColors(sizes[i], centers[i], cornerRadiusIndices[i], borderThicknessIndices[i], insideColorIndices[i], borderColorIndices[i], packedColors)
-        multimesh.set_instance_color(i, packedColors[0])
-        multimesh.set_instance_custom_data(i, packedColors[1])
+    for i in range(iajl.mmi.multimesh.instance_count):
+        iajl.sizes[i] = Vector2(128, 256)
+        iajl.rotations[i] = 1
+        iajl.poses[i] = Vector2(640, 360)
+        iajl.centers[i] = Vector2(64, 128)
+        iajl.cornerRadiusIndices[i] = 0
+        iajl.borderThicknessIndices[i] = borderThicknessNames.BUILD
+        iajl.insideColorIndices[i] = colorNames.BUILD_INSIDE
+        iajl.borderColorIndices[i] = colorNames.BUILD_BORDER
+
+    bgal.render()
+    ol.render()
+    #iajl.render()

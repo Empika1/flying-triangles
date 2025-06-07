@@ -18,8 +18,8 @@ vec4 premult_mix(vec4 color1, vec4 color2, float t) {
 }
 
 float box(vec2 position, vec2 halfSize, float cornerRadius) {
-   position = abs(position) - halfSize + cornerRadius;
-   return length(max(position, 0.0)) + min(max(position.x, position.y), 0.0) - cornerRadius;
+    position = abs(position) - halfSize + cornerRadius;
+    return length(max(position, 0.0)) + min(max(position.x, position.y), 0.0) - cornerRadius;
 }
 
 varying vec4 customData;
@@ -32,7 +32,7 @@ void fragment() {
     uint customData0 = uint(int(customData[0]) + 2048);
     uint customData1 = uint(int(customData[1]) + 2048);
     uint customData2 = uint(int(customData[2]) + 2048);
-    uint customData3 = uint(int(customData[3]) + 2048);
+    //uint customData3 = uint(int(customData[3]) + 2048);
 
     vec2 size = vec2(customColor[0], customColor[1]);
     vec2 center = vec2(customColor[2], customColor[3]);
