@@ -186,11 +186,12 @@ class RenderLayer extends RefCounted:
     var renderDataTex: ImageTexture = ImageTexture.create_from_image(renderDataImg)
     func renderPartial() -> void: #doesn't directly send data to the shaders. render does that.
         mmi.set_instance_shader_parameter("scale", outer.scale)
+        mmi.set_instance_shader_parameter("aaWidth", outer.aaWidth)
         mmi.multimesh.visible_instance_count = renderSpot
         for i in range(renderSpot):
             var transform_ := Transform2D()
             transform_ = transform_.rotated_local(rotations[i])
-            transform_ = transform_.scaled_local(sizes[i])
+            transform_ = transform_.scaled_local(sizes[i] + Vector2(outer.aaWidth, outer.aaWidth) * 2) #added so AA doesn't get cut off
             transform_.origin = poses[i]
             mmi.multimesh.set_instance_transform_2d(i, transform_)
 
@@ -222,6 +223,7 @@ func render() -> void:
     sm.set_shader_parameter("data", renderDataTexAll)
 
 #TODO: make this good
+const aaWidth: float = 0.5
 var scale: float = 1
 var shift: Vector2 = Vector2(0, 0)
 func zoom(deltaScale: float, screen_pos: Vector2):
@@ -405,6 +407,7 @@ func _process(_delta: float) -> void:
     addCCW(Vector2(52.25, 146.9), 40 * 0.5, 0)
     addWater(Vector2(187.75, 105.225), Vector2(109.49074161772768, 4), -0.8652410242593587)
     addWood(Vector2(272, 104.925), Vector2(150.85248589267596, 8), 1.7568161828669435)
+    #bordersLayer.addRenderObjectTransformed(Vector2(100, 100), 0, Vector2(0, 0), Vector2(50, 50), ObjType.STATIC_RECT_BORDER)
 
     render()
 

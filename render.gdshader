@@ -78,7 +78,7 @@ const int TypeNames_CCW_BORDER = 19, TypeNames_CCW_INSIDE = 20, TypeNames_CCW_DE
 const int TypeNames_UPW_BORDER = 22, TypeNames_UPW_INSIDE = 23, TypeNames_UPW_DECAL = 24;
 const int TypeNames_BUILD_BORDER = 25, TypeNames_BUILD_INSIDE = 26;
 const int TypeNames_GOAL_BORDER = 27, TypeNames_GOAL_INSIDE = 28;
-const int TypeNames_JOINT_NORMAL_BORDER = 29, TypeNames_JOINT_WHEEL_CENTER_BORDER = 30;
+const int TypeNames_JOINT_NORMAL = 29, TypeNames_JOINT_WHEEL_CENTER = 30;
 const int TypeNames_SIZE = 31;
 
 uniform vec4[TypeNames_SIZE] colorsGlobal;
@@ -86,6 +86,7 @@ uniform float[TypeNames_SIZE] cornerRadiiGlobal;
 uniform float[TypeNames_SIZE] borderThicknessesGlobal; //TODO: figure out if this is needed
 
 instance uniform float scale;
+instance uniform float aaWidth;
 const int layers = 3;
 instance uniform int layerID;
 
@@ -109,7 +110,8 @@ void fragment() {
     float cornerRadius;
     float borderThickness;
 
-    vec2 pixelPos = size * UV;
+    vec2 sizeWithAA = size + vec2(aaWidth) * 2.;
+    vec2 pixelPos = UV * sizeWithAA - vec2(aaWidth) - center;
     float d = inf;
 
     switch(type) {
@@ -123,7 +125,7 @@ void fragment() {
             borderColor = colorsGlobal[type];
             insideColor = borderColor;
             cornerRadius = cornerRadiiGlobal[type] * scale;
-            borderThickness = 0. * scale;
+            borderThickness = 0.;
             break;
         case TypeNames_STATIC_RECT_INSIDE: //rect insides
         case TypeNames_DYNAMIC_RECT_INSIDE:
@@ -134,8 +136,8 @@ void fragment() {
         case TypeNames_GOAL_INSIDE:
             borderColor = colorsGlobal[type];
             insideColor = borderColor;
-            cornerRadius = 0. * scale;
-            borderThickness = 0. * scale;
+            cornerRadius = 0.;
+            borderThickness = 0.;
             break;
         case TypeNames_STATIC_CIRC_BORDER: //filled circles
         case TypeNames_STATIC_CIRC_INSIDE:
@@ -154,38 +156,37 @@ void fragment() {
             cornerRadius = size.x / 2.; //should be equal to size.y because this is a circle
             borderThickness = 0.;
             break;
-        case TypeNames_JOINT_NORMAL_BORDER: //hollow circles
-        case TypeNames_JOINT_WHEEL_CENTER_BORDER:
+        case TypeNames_JOINT_NORMAL: //hollow circles
+        case TypeNames_JOINT_WHEEL_CENTER:
             borderColor = colorsGlobal[type];
             insideColor = vec4(0.);
             cornerRadius = size.x / 2.; //should be equal to size.y because this is a circle
             borderThickness = borderThicknessesGlobal[type] * scale;
             break;
-        case TypeNames_CW_DECAL: //wheel decals (all handled individually)
+        case TypeNames_CW_DECAL: //wheel decals (all handled individually) TODO: figure out why decals make an ugly square at very high AA value
             borderColor = colorsGlobal[type];
             insideColor = colorsGlobal[type];
             borderThickness = 0.;
-            d = sdPoweredDecal(vec2(UV.x, 1. - UV.y)) * size.x; //decal SDF assumed fixed size
+            d = sdPoweredDecal(vec2(UV.x, 1. - UV.y)) * sizeWithAA.x; //decal SDF assumed fixed size
             break;
         case TypeNames_CCW_DECAL:
             borderColor = colorsGlobal[type];
             insideColor = colorsGlobal[type];
             borderThickness = 0.;
-            d = sdPoweredDecal(vec2(1. - UV.x, 1. - UV.y)) * size.x; //flip horizontally for CCW decal
+            d = sdPoweredDecal(vec2(1. - UV.x, 1. - UV.y)) * sizeWithAA.x; //flip horizontally for CCW decal
             break;
         case TypeNames_UPW_DECAL: //TODO: make right decal
             borderColor = colorsGlobal[type];
             insideColor = colorsGlobal[type];
             borderThickness = 0.;
-            d = sdUnpoweredDecal(vec2(1. - UV.x, UV.y)) * size.x; //flip horizontally for CCW decal
+            d = sdUnpoweredDecal(vec2(1. - UV.x, UV.y)) * sizeWithAA.x; //flip horizontally for CCW decal
             break;
     }
     
     if(d == inf) { //decals set d separately
-        d = sdRoundedRect(pixelPos - center, size / 2., cornerRadius);
+        d = sdRoundedRect(pixelPos, size / 2., cornerRadius);
     }
 
-    const float aaWidth = 0.5;
     float outsideA = clamp((d + aaWidth) / (2. * aaWidth),  0.0, 1.0);
     float insideA  = clamp(1.0 - (d + borderThickness + aaWidth) / (2. * aaWidth), 0.0, 1.0);
     float borderA  = clamp(1.0 - outsideA - insideA, 0.0, 1.0);
