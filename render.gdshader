@@ -44,7 +44,6 @@ float sdPoweredDecal(vec2 p) {
     float d4 = sdTriangle(p, vec2(0.61875, 0.63125), vec2(0.825, 0.83125), vec2(0.6, 0.84375));
     float d5 = sdTriangle(p, vec2(0.63125, 0.55), vec2(0.53125, 1.59375), vec2(-1., 0.55));
     return min(max(min(max(d1, -d5), d2), -d3), d4);
-    //return max(d1, -d5);
 }
 
 //inexact! works for my purposes tho
@@ -189,9 +188,10 @@ void fragment() {
         d = sdRoundedRect(pixelPos - center, size / 2., cornerRadius);
     }
 
-    float outsideA = clamp(d + 0.5,  0.0, 1.0);
-    float insideA  = clamp(1.0 - (d + borderThickness + 0.5), 0.0, 1.0);
-    float borderA  = clamp(1.0 - outsideA - insideA,          0.0, 1.0);
+    const float aaWidth = 0.5;
+    float outsideA = clamp((d + aaWidth) / (2. * aaWidth),  0.0, 1.0);
+    float insideA  = clamp(1.0 - (d + borderThickness + aaWidth) / (2. * aaWidth), 0.0, 1.0);
+    float borderA  = clamp(1.0 - outsideA - insideA, 0.0, 1.0);
 
     vec4 outsideColorPremult = outsideColor;
     vec4 borderColorPremult = borderColor;
