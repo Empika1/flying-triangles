@@ -12,9 +12,56 @@ vec4 premult_mix(vec4 color1, vec4 color2, float t) {
     return vec4(rgb, a);
 }
 
-float box(vec2 position, vec2 halfSize, float cornerRadius) {
+//from https://www.shadertoy.com/view/Nlc3zf
+float sdRoundedRect(vec2 position, vec2 halfSize, float cornerRadius) {
     position = abs(position) - halfSize + cornerRadius;
     return length(max(position, 0.0)) + min(max(position.x, position.y), 0.0) - cornerRadius;
+}
+
+float sdCirc(vec2 p, vec2 c, float r) {
+    return length(p - c) - r;
+}
+
+//from https://iquilezles.org/articles/distfunctions2d/
+float sdTriangle( in vec2 p, in vec2 p0, in vec2 p1, in vec2 p2 ) {
+    vec2 e0 = p1-p0, e1 = p2-p1, e2 = p0-p2;
+    vec2 v0 = p -p0, v1 = p -p1, v2 = p -p2;
+    vec2 pq0 = v0 - e0*clamp( dot(v0,e0)/dot(e0,e0), 0.0, 1.0 );
+    vec2 pq1 = v1 - e1*clamp( dot(v1,e1)/dot(e1,e1), 0.0, 1.0 );
+    vec2 pq2 = v2 - e2*clamp( dot(v2,e2)/dot(e2,e2), 0.0, 1.0 );
+    float s = sign( e0.x*e2.y - e0.y*e2.x );
+    vec2 d = min(min(vec2(dot(pq0,pq0), s*(v0.x*e0.y-v0.y*e0.x)),
+                     vec2(dot(pq1,pq1), s*(v1.x*e1.y-v1.y*e1.x))),
+                     vec2(dot(pq2,pq2), s*(v2.x*e2.y-v2.y*e2.x)));
+    return -sqrt(d.x)*sign(d.y);
+}
+
+//inexact! works for my purposes tho
+float sdPoweredDecal(vec2 p) {
+    float d1 = sdCirc(p, vec2(0.5, 0.5), 0.35297619047);
+    float d2 = sdCirc(p, vec2(0.27344, 0.53), 0.125);
+    float d3 = sdCirc(p, vec2(0.575, 0.575), 0.18035714285);
+    float d4 = sdTriangle(p, vec2(0.61875, 0.63125), vec2(0.825, 0.83125), vec2(0.6, 0.84375));
+    float d5 = sdTriangle(p, vec2(0.63125, 0.55), vec2(0.53125, 1.59375), vec2(-1., 0.55));
+    return min(max(min(max(d1, -d5), d2), -d3), d4);
+    //return max(d1, -d5);
+}
+
+//inexact! works for my purposes tho
+float sdUnpoweredDecalHalf(vec2 p) {
+    float d1 = sdCirc(p, vec2(0.5, 0.5), 0.35297619047);
+    float d2 = sdCirc(p, vec2(0.4227, 0.575030012), 0.276);
+    const float rTot = 0.29439;
+    float d3 = sdCirc(p, vec2(0.64945, 0.273), rTot * 0.5);
+    float d4 = sdCirc(p, vec2(0.795, 0.455), rTot * 0.5);
+    float d5 = d3 + d4;
+    float d6 = sdTriangle(p, vec2(0., 0.63), vec2(1., 0.29), vec2(1., 2.));
+    return min(max(max(d1, -d2), -d6), d5);
+}
+
+//inexact! works for my purposes tho
+float sdUnpoweredDecal(vec2 p) {
+    return min(sdUnpoweredDecalHalf(p), sdUnpoweredDecalHalf(vec2(1.) - p));
 }
 
 varying flat int id;
@@ -48,6 +95,7 @@ instance uniform int layerID;
 
 uniform sampler2D[layers] data;
 
+const float inf = 1. / 0.;
 void fragment() {
     vec4 idDataF = texelFetch(data[layerID], ivec2(id % 128, id / 128), 0);
     uvec4 idDataU = uvec4(floatBitsToUint(idDataF[0]), floatBitsToUint(idDataF[1]), floatBitsToUint(idDataF[2]), floatBitsToUint(idDataF[3]));
@@ -64,6 +112,9 @@ void fragment() {
     vec4 insideColor;
     float cornerRadius;
     float borderThickness;
+
+    vec2 pixelPos = size * UV;
+    float d = inf;
 
     switch(type) {
         case TypeNames_STATIC_RECT_BORDER: //rect borders
@@ -114,23 +165,42 @@ void fragment() {
             cornerRadius = size.x / 2.; //should be equal to size.y because this is a circle
             borderThickness = borderThicknessesGlobal[type] * scale;
             break;
-        default: //TODO: implement decals
+        case TypeNames_CW_DECAL: //wheel decals (all handled individually)
+            borderColor = colorsGlobal[type];
+            insideColor = colorsGlobal[type];
+            borderThickness = 0.;
+            d = sdPoweredDecal(vec2(UV.x, 1. - UV.y)) * size.x; //decal SDF assumed fixed size
+            break;
+        case TypeNames_CCW_DECAL:
+            borderColor = colorsGlobal[type];
+            insideColor = colorsGlobal[type];
+            borderThickness = 0.;
+            d = sdPoweredDecal(vec2(1. - UV.x, 1. - UV.y)) * size.x; //flip horizontally for CCW decal
+            break;
+        case TypeNames_UPW_DECAL: //TODO: make right decal
+            borderColor = colorsGlobal[type];
+            insideColor = colorsGlobal[type];
+            borderThickness = 0.;
+            d = sdUnpoweredDecal(vec2(1. - UV.x, UV.y)) * size.x; //flip horizontally for CCW decal
             break;
     }
-
-    vec2 pixelPos = size * UV;
-    float d = box(pixelPos - center, size / 2., cornerRadius);
-
-    //TODO: make this antialias half and half pixels (i will know what this means)
-    if(d > 0.) {
-        COLOR = vec4(0);
-    } else if(d > -1.) {
-        COLOR = premult_mix(borderColor, outsideColor, d - -1.);
-    } else if(d > -borderThickness) {
-        COLOR = borderColor;
-    } else if(d > -borderThickness - 1.) {
-        COLOR = premult_mix(insideColor, borderColor, d - (-borderThickness - 1.));
-    } else {
-        COLOR = insideColor;
+    
+    if(d == inf) { //decals set d separately
+        d = sdRoundedRect(pixelPos - center, size / 2., cornerRadius);
     }
+
+    float outsideA = clamp(d + 0.5,  0.0, 1.0);
+    float insideA  = clamp(1.0 - (d + borderThickness + 0.5), 0.0, 1.0);
+    float borderA  = clamp(1.0 - outsideA - insideA,          0.0, 1.0);
+
+    vec4 outsideColorPremult = outsideColor;
+    vec4 borderColorPremult = borderColor;
+    vec4 insideColorPremult  = insideColor;
+    outsideColorPremult.rgb *= outsideColorPremult.a;
+    borderColorPremult.rgb *= borderColorPremult.a;
+    insideColorPremult.rgb  *= insideColorPremult.a;
+
+    vec4 colPremult = outsideColorPremult * outsideA + borderColorPremult * borderA + insideColorPremult * insideA;
+
+    COLOR = vec4(colPremult.a == 0. ? vec3(0.) : colPremult.rgb / colPremult.a, colPremult.a);
 }

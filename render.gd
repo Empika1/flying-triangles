@@ -48,8 +48,8 @@ func setColors() -> void:
     colors[ObjType.WOOD_BORDER] = Color("#b55900"); colors[ObjType.WOOD_INSIDE] = Color("#6b3400")
     colors[ObjType.WATER_BORDER] = Color("#ffffff"); colors[ObjType.WATER_INSIDE] = Color("#0000ff")
     colors[ObjType.CW_BORDER] = Color("#fc8003"); colors[ObjType.CW_INSIDE] = Color("#ffec00"); colors[ObjType.CW_DECAL] = Color("#fc8003")
-    colors[ObjType.CCW_BORDER] = Color("#d147a5"); colors[ObjType.CCW_INSIDE] = Color("#ffcccc"); colors[ObjType.CW_DECAL] = Color("#d147a5")
-    colors[ObjType.UPW_BORDER] = Color("#0a69fd"); colors[ObjType.UPW_INSIDE] = Color("#89fae3"); colors[ObjType.CW_DECAL] = Color("#4a69fd")
+    colors[ObjType.CCW_BORDER] = Color("#d147a5"); colors[ObjType.CCW_INSIDE] = Color("#ffcccc"); colors[ObjType.CCW_DECAL] = Color("#d147a5")
+    colors[ObjType.UPW_BORDER] = Color("#0a69fd"); colors[ObjType.UPW_INSIDE] = Color("#89fae3"); colors[ObjType.UPW_DECAL] = Color("#4a69fd")
     colors[ObjType.BUILD_BORDER] = Color("#7777ee"); colors[ObjType.BUILD_INSIDE] = Color("#bcdbf9")
     colors[ObjType.GOAL_BORDER] = Color("#bb6666"); colors[ObjType.GOAL_INSIDE] = Color("#f19191")
     colors[ObjType.JOINT_NORMAL] = Color("#838383"); colors[ObjType.JOINT_WHEEL_CENTER] = Color("#ffffff");
@@ -267,9 +267,17 @@ func setPieceInsides() -> void:
     pieceInsides[PieceType.BUILD] = ObjType.BUILD_INSIDE
     pieceInsides[PieceType.GOAL] = ObjType.GOAL_INSIDE
 
+var pieceDecals: Array[ObjType]
+func setPieceDecals() -> void:
+    pieceDecals.resize(PieceType.size())
+    pieceDecals[PieceType.CW] = ObjType.CW_DECAL
+    pieceDecals[PieceType.CCW] = ObjType.CCW_DECAL
+    pieceDecals[PieceType.UPW] = ObjType.UPW_DECAL
+
 func setupPieceArrays() -> void:
     setPieceBorders()
     setPieceInsides()
+    setPieceDecals()
 
 func addRoundedRect(size: Vector2, rotation: float, pos: Vector2, type: PieceType, borderLayer: RenderLayer, insideLayer: RenderLayer) -> void:
     var borderType: ObjType = pieceBorders[type]
@@ -299,8 +307,7 @@ func addJointedRod(size: Vector2, rotation: float, pos: Vector2, type: PieceType
     addJoint(Vector2(-size.x * 0.5, 0).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
 
 const innerJointThresholdRadius: float = 20
-func addJointedCircle(radius: float, rotation: float, pos: Vector2, type: PieceType) -> void:
-    addCirclePiece(radius, rotation, pos, type)
+func addCircleJoints(radius: float, rotation: float, pos: Vector2) -> void:
     addJoint(pos, 0, ObjType.JOINT_WHEEL_CENTER)
     addJoint(Vector2(radius, 0).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
     addJoint(Vector2(-radius, 0).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
@@ -311,6 +318,19 @@ func addJointedCircle(radius: float, rotation: float, pos: Vector2, type: PieceT
         addJoint(Vector2(-innerJointThresholdRadius, 0).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
         addJoint(Vector2(0, innerJointThresholdRadius).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
         addJoint(Vector2(0, -innerJointThresholdRadius).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
+
+func addJointedCircle(radius: float, rotation: float, pos: Vector2, type: PieceType) -> void:
+    addCirclePiece(radius, rotation, pos, type)
+    addCircleJoints(radius, rotation, pos)
+
+func addDecalCircle(radius: float, rotation: float, pos: Vector2, type: PieceType) -> void:
+    addCirclePiece(radius, rotation, pos, type)
+    var size: Vector2 = Vector2(radius, radius) * 2
+    var borderType: ObjType = pieceBorders[type]
+    var borderOffset = Vector2(borderThicknesses[borderType], borderThicknesses[borderType])
+    var insideSize: Vector2 = size - 2 * borderOffset
+    insidesLayer.addRenderObjectTransformed(insideSize, rotation, pos, insideSize * 0.5, pieceDecals[type]) #maybe make this a seperate function if i ever wanna add just a decal
+    addCircleJoints(radius, rotation, pos)
 
 func addStaticRect(pos: Vector2, size: Vector2, rotation: float) -> void:
     addRoundedRectPiece(size, rotation, pos, PieceType.STATIC_RECT)
@@ -343,13 +363,13 @@ func addWater(pos: Vector2, size: Vector2, rotation: float) -> void:
     addJointedRod(Vector2(size.x, size.y + waterWidthPadding), rotation, pos, PieceType.WATER)
 
 func addCW(pos: Vector2, radius: float, rotation: float) -> void:
-    addJointedCircle(radius, rotation, pos, PieceType.CW)
+    addDecalCircle(radius, rotation, pos, PieceType.CW)
 
 func addCCW(pos: Vector2, radius: float, rotation: float) -> void:
-    addJointedCircle(radius, rotation, pos, PieceType.CCW)
+    addDecalCircle(radius, rotation, pos, PieceType.CCW)
 
 func addUPW(pos: Vector2, radius: float, rotation: float) -> void:
-    addJointedCircle(radius, rotation, pos, PieceType.UPW)
+    addDecalCircle(radius, rotation, pos, PieceType.UPW)
 
 func addBuildArea(pos: Vector2, size: Vector2, rotation: float) -> void:
     addArea(size, rotation, pos, PieceType.BUILD)
@@ -380,7 +400,9 @@ func _process(_delta: float) -> void:
     addStaticCirc(Vector2(158.4, 316.8), 96.4, 0)
     addStaticCirc(Vector2(521.45, 305.5500000000001), 71.5, 0)
     addGPCirc(Vector2(223.25, 63.54999999999999), 26 * 0.5, 0)
-    addCW(Vector2(152.25, 146.9), 40 * 0.5, 0)
+    addUPW(Vector2(152.25, 146.9), 40 * 0.5, 0)
+    addCW(Vector2(102.25, 146.9), 40 * 0.5, 0)
+    addCCW(Vector2(52.25, 146.9), 40 * 0.5, 0)
     addWater(Vector2(187.75, 105.225), Vector2(109.49074161772768, 4), -0.8652410242593587)
     addWood(Vector2(272, 104.925), Vector2(150.85248589267596, 8), 1.7568161828669435)
 
