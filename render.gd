@@ -144,26 +144,23 @@ class RenderLayer extends RefCounted:
         objTypes[renderSpot] = type
         renderSpot += 1
 
-    func addRenderObjectTransformed(size: Vector2, rotation: float, pos: Vector2, center: Vector2, type: ObjType) -> void:
-        addRenderObject(size * outer.scale, rotation, pos * outer.scale + outer.shift, center * outer.scale, type)
-
     func resetRenderObjects() -> void:
         renderSpot = 0
 
     var renderDataImg: Image = Image.create_empty(128, 128, false, Image.FORMAT_RGBAF) #128*128 instances allowed (should be plenty)
     var renderDataTex: ImageTexture = ImageTexture.create_from_image(renderDataImg)
-    func renderPartial() -> void: #doesn't directly send data to the shaders. render does that.
+    func renderPartial() -> void: #doesn't directly send data to the shaders. outer.render does that.
         mmi.set_instance_shader_parameter("scale", outer.scale)
         mmi.set_instance_shader_parameter("aaWidth", outer.aaWidth)
         mmi.multimesh.visible_instance_count = renderSpot
         for i in range(renderSpot):
             var transform_ := Transform2D()
             transform_ = transform_.rotated_local(rotations[i])
-            transform_ = transform_.scaled_local(sizes[i] + Vector2(outer.aaWidth, outer.aaWidth) * 2) #added so AA doesn't get cut off
-            transform_.origin = poses[i]
+            transform_ = transform_.scaled_local((sizes[i] + Vector2(outer.aaWidth, outer.aaWidth) * 2) * outer.scale) #added so AA doesn't get cut off
+            transform_.origin = poses[i] * outer.scale + outer.shift
             mmi.multimesh.set_instance_transform_2d(i, transform_)
 
-            var data: Color = outer.packDataToColor(sizes[i], centers[i], objTypes[i])
+            var data: Color = outer.packDataToColor(sizes[i] * outer.scale, centers[i] * outer.scale, objTypes[i])
             @warning_ignore("integer_division")
             renderDataImg.set_pixel(i % 128, i / 128, data)
         renderDataTex.update(renderDataImg)
@@ -262,8 +259,8 @@ func addRoundedRect(size: Vector2, rotation: float, pos: Vector2, type: PieceTyp
     var borderOffset = Vector2(borderThicknesses[borderType], borderThicknesses[borderType])
     var insideSize: Vector2 = Vector2(getRealInsideSize(size.x, borderOffset.x), getRealInsideSize(size.y, borderOffset.y));
     var borderSize: Vector2 = Vector2(getRealBorderSize(size.x, insideSize.x), getRealBorderSize(size.y, insideSize.y))
-    borderLayer.addRenderObjectTransformed(borderSize, rotation, pos, borderSize * 0.5, borderType)
-    insideLayer.addRenderObjectTransformed(insideSize, rotation, pos, insideSize * 0.5, insideType)
+    borderLayer.addRenderObject(borderSize, rotation, pos, borderSize * 0.5, borderType)
+    insideLayer.addRenderObject(insideSize, rotation, pos, insideSize * 0.5, insideType)
 
 func addRoundedRectPiece(size: Vector2, rotation: float, pos: Vector2, type: PieceType) -> void:
     addRoundedRect(size, rotation, pos, type, bordersLayer, insidesLayer)
@@ -277,7 +274,7 @@ func addCirclePiece(radius: float, rotation: float, pos: Vector2, type: PieceTyp
 const jointRadius: float = 4
 func addJoint(pos: Vector2, rotation: float, type: ObjType) -> void:
     var size: Vector2 = Vector2(jointRadius, jointRadius) * 2
-    insidesLayer.addRenderObjectTransformed(Vector2(jointRadius, jointRadius) * 2, rotation, pos, size * 0.5, type)
+    insidesLayer.addRenderObject(Vector2(jointRadius, jointRadius) * 2, rotation, pos, size * 0.5, type)
 
 func addJointedRod(size: Vector2, rotation: float, pos: Vector2, type: PieceType) -> void:
     addRoundedRectPiece(size, rotation, pos, type)
@@ -307,7 +304,7 @@ func addDecalCircle(radius: float, rotation: float, pos: Vector2, type: PieceTyp
     var borderType: ObjType = pieceBorders[type]
     var borderOffset = Vector2(borderThicknesses[borderType], borderThicknesses[borderType])
     var insideSize: Vector2 = size - 2 * borderOffset
-    insidesLayer.addRenderObjectTransformed(insideSize, rotation, pos, insideSize * 0.5, pieceDecals[type]) #maybe make this a seperate function if i ever wanna add just a decal
+    insidesLayer.addRenderObject(insideSize, rotation, pos, insideSize * 0.5, pieceDecals[type]) #maybe make this a seperate function if i ever wanna add just a decal
     addCircleJoints(radius, rotation, pos)
 
 func addStaticRect(pos: Vector2, size: Vector2, rotation: float) -> void:
@@ -555,7 +552,6 @@ func _process(_delta: float) -> void:
     addWater        (Vector2(260.5250000000001,  -292.22499999999997),Vector2(237.8662754574508,4), 1.856112300080174);
     addWater        (Vector2(300.1750000000002,  -308.90000000000003),Vector2(299.70589333544973,4),-1.0610241619609253);
     addWater        (Vector2(158.29999999999998, -311.1500000000001), Vector2(299.5253912442148,4), 1.0938599674468634);
-
 
     render()
 
