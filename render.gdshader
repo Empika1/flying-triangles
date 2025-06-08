@@ -50,12 +50,9 @@ float sdPoweredDecal(vec2 p) {
 float sdUnpoweredDecalHalf(vec2 p) {
     float d1 = sdCirc(p, vec2(0.5, 0.5), 0.35297619047);
     float d2 = sdCirc(p, vec2(0.4227, 0.575030012), 0.276);
-    const float rTot = 0.29439;
-    float d3 = sdCirc(p, vec2(0.64945, 0.273), rTot * 0.5);
-    float d4 = sdCirc(p, vec2(0.795, 0.455), rTot * 0.5);
-    float d5 = d3 + d4;
-    float d6 = sdTriangle(p, vec2(0., 0.63), vec2(1., 0.29), vec2(1., 2.));
-    return min(max(max(d1, -d2), -d6), d5);
+    float d3 = distance(p, vec2(0.64945, 0.273)) + distance(p, vec2(0.795, 0.455)) - 0.29439;
+    float d4 = sdTriangle(p, vec2(0., 0.63), vec2(1., 0.29), vec2(1., 2.));
+    return min(max(max(d1, -d2), -d4), d3);
 }
 
 //inexact! works for my purposes tho
