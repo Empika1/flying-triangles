@@ -1,5 +1,7 @@
 extends Node
 
+var sm: ShaderMaterial = load("res://render.tres")
+
 enum ObjType {
     STATIC_RECT_BORDER, STATIC_RECT_INSIDE,
     STATIC_CIRC_BORDER, STATIC_CIRC_INSIDE,
@@ -16,25 +18,6 @@ enum ObjType {
     GOAL_BORDER, GOAL_INSIDE,
     JOINT_NORMAL, JOINT_WHEEL_CENTER,
 }
-
-# enum ColorNames {
-#     STATIC_RECT_BORDER, STATIC_RECT_INSIDE,
-#     STATIC_CIRC_BORDER, STATIC_CIRC_INSIDE,
-#     DYNAMIC_RECT_BORDER, DYNAMIC_RECT_INSIDE,
-#     DYNAMIC_CIRC_BORDER, DYNAMIC_CIRC_INSIDE,
-#     GP_RECT_BORDER, GP_RECT_INSIDE,
-#     GP_CIRC_BORDER, GP_CIRC_INSIDE,
-#     WOOD_BORDER, WOOD_INSIDE,
-#     WATER_BORDER, WATER_INSIDE,
-#     CW_BORDER, CW_INSIDE, CW_DECAL,
-#     CCW_BORDER, CCW_INSIDE, CCW_DECAL,
-#     UPW_BORDER, UPW_INSIDE, UPW_DECAL,
-#     BUILD_BORDER, BUILD_INSIDE,
-#     GOAL_BORDER, GOAL_INSIDE,
-#     JOINT_NORMAL_BORDER, JOINT_WHEEL_CENTER_BORDER,
-# }
-
-var sm: ShaderMaterial = load("res://render.tres")
 
 var colors: Array[Color]
 func setColors() -> void:
@@ -61,20 +44,16 @@ func setShaderColors() -> void:
         shaderColors[i] = Vector4(colors[i][0], colors[i][1], colors[i][2], colors[i][3])
     sm.set_shader_parameter("colorsGlobal", shaderColors)
 
-# enum CornerRadiusNames {
-#     STATIC_RECT, DYNAMIC_RECT, GP_RECT, WOOD, WATER, BUILD, GOAL, ZERO
-# }
-
 var cornerRadii: Array[float]
 func setCornerRadii() -> void:
     cornerRadii.resize(ObjType.size())
-    cornerRadii[ObjType.STATIC_RECT_BORDER] = 2.4
-    cornerRadii[ObjType.DYNAMIC_RECT_BORDER] = 2.4
-    cornerRadii[ObjType.GP_RECT_BORDER] = 2.4
-    cornerRadii[ObjType.WOOD_BORDER] = 1.6
-    cornerRadii[ObjType.WATER_BORDER] = 1.6
-    cornerRadii[ObjType.BUILD_BORDER] = 1.6
-    cornerRadii[ObjType.GOAL_BORDER] = 1.6
+    cornerRadii[ObjType.STATIC_RECT_BORDER] = 3
+    cornerRadii[ObjType.DYNAMIC_RECT_BORDER] = 3
+    cornerRadii[ObjType.GP_RECT_BORDER] = 3
+    cornerRadii[ObjType.WOOD_BORDER] = 2
+    cornerRadii[ObjType.WATER_BORDER] = 2
+    cornerRadii[ObjType.BUILD_BORDER] = 2
+    cornerRadii[ObjType.GOAL_BORDER] = 2
 
 func setShaderCornerRadii() -> void: #TODO: make these accurate
     var shaderCornerRadii: PackedFloat32Array
@@ -83,17 +62,6 @@ func setShaderCornerRadii() -> void: #TODO: make these accurate
         shaderCornerRadii[i] = cornerRadii[i]
     sm.set_shader_parameter("cornerRadiiGlobal", shaderCornerRadii)
 
-# enum BorderThicknessNames {
-#     STATIC_RECT, STATIC_CIRC,
-#     DYNAMIC_RECT, DYNAMIC_CIRC,
-#     GP_RECT, GP_CIRC,
-#     WOOD, WATER,
-#     CW, CCW, UPW,
-#     BUILD, GOAL,
-#     JOINT_NORMAL, JOINT_WHEEL_CENTER,
-#     ZERO
-# }
-
 var borderThicknesses: Array[float]
 func setBorderThicknesses() -> void: #TODO: make these accurate
     borderThicknesses.resize(ObjType.size())
@@ -101,7 +69,7 @@ func setBorderThicknesses() -> void: #TODO: make these accurate
     borderThicknesses[ObjType.DYNAMIC_RECT_BORDER] = 4; borderThicknesses[ObjType.DYNAMIC_CIRC_BORDER] = 4
     borderThicknesses[ObjType.GP_RECT_BORDER] = 4; borderThicknesses[ObjType.GP_CIRC_BORDER] = 4
     borderThicknesses[ObjType.STATIC_RECT_BORDER] = 4; borderThicknesses[ObjType.STATIC_CIRC_BORDER] = 4
-    borderThicknesses[ObjType.WOOD_BORDER] = 2.5; borderThicknesses[ObjType.WATER_BORDER] = 2.5
+    borderThicknesses[ObjType.WOOD_BORDER] = 3; borderThicknesses[ObjType.WATER_BORDER] = 3
     borderThicknesses[ObjType.BUILD_BORDER] = 4; borderThicknesses[ObjType.GOAL_BORDER] = 4
     borderThicknesses[ObjType.CW_BORDER] = 4; borderThicknesses[ObjType.CCW_BORDER] = 4; borderThicknesses[ObjType.UPW_BORDER] = 4;
     borderThicknesses[ObjType.JOINT_NORMAL] = 2; borderThicknesses[ObjType.JOINT_WHEEL_CENTER] = 2
@@ -308,6 +276,10 @@ func addJointedRod(size: Vector2, rotation: float, pos: Vector2, type: PieceType
     addJoint(Vector2(size.x * 0.5, 0).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
     addJoint(Vector2(-size.x * 0.5, 0).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
 
+func addRodJoints(size: Vector2, rotation: float, pos: Vector2) -> void:
+    addJoint(Vector2(size.x * 0.5, 0).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
+    addJoint(Vector2(-size.x * 0.5, 0).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
+
 const innerJointThresholdRadius: float = 20
 func addCircleJoints(radius: float, rotation: float, pos: Vector2) -> void:
     addJoint(pos, 0, ObjType.JOINT_WHEEL_CENTER)
@@ -320,10 +292,6 @@ func addCircleJoints(radius: float, rotation: float, pos: Vector2) -> void:
         addJoint(Vector2(-innerJointThresholdRadius, 0).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
         addJoint(Vector2(0, innerJointThresholdRadius).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
         addJoint(Vector2(0, -innerJointThresholdRadius).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
-
-func addJointedCircle(radius: float, rotation: float, pos: Vector2, type: PieceType) -> void:
-    addCirclePiece(radius, rotation, pos, type)
-    addCircleJoints(radius, rotation, pos)
 
 func addDecalCircle(radius: float, rotation: float, pos: Vector2, type: PieceType) -> void:
     addCirclePiece(radius, rotation, pos, type)
@@ -355,14 +323,18 @@ func addGPRect(pos: Vector2, size: Vector2, rotation: float) -> void:
     addJoint(Vector2(-size.x * 0.5, -size.y * 0.5).rotated(rotation) + pos, 0, ObjType.JOINT_NORMAL)
 
 func addGPCirc(pos: Vector2, radius: float, rotation: float) -> void:
-    addJointedCircle(radius, rotation, pos, PieceType.GP_CIRC)
+    addCirclePiece(radius, rotation, pos, PieceType.GP_CIRC)
+    addCircleJoints(radius, rotation, pos)
 
+const woodSizePadding: Vector2 = Vector2(-2, 2) #TODO: decide if this padding even looks good
 func addWood(pos: Vector2, size: Vector2, rotation: float) -> void:
-    addJointedRod(size, rotation, pos, PieceType.WOOD)
+    addRoundedRectPiece(size + woodSizePadding, rotation, pos, PieceType.WOOD)
+    addRodJoints(size, rotation, pos)
 
-const waterWidthPadding: float = 6
+const waterSizePadding: Vector2 = Vector2(-2, 6)
 func addWater(pos: Vector2, size: Vector2, rotation: float) -> void:
-    addJointedRod(Vector2(size.x, size.y + waterWidthPadding), rotation, pos, PieceType.WATER)
+    addRoundedRectPiece(size + waterSizePadding, rotation, pos, PieceType.WATER)
+    addRodJoints(size, rotation, pos)
 
 func addCW(pos: Vector2, radius: float, rotation: float) -> void:
     addDecalCircle(radius, rotation, pos, PieceType.CW)
@@ -407,7 +379,6 @@ func _process(_delta: float) -> void:
     addCCW(Vector2(52.25, 146.9), 40 * 0.5, 0)
     addWater(Vector2(187.75, 105.225), Vector2(109.49074161772768, 4), -0.8652410242593587)
     addWood(Vector2(272, 104.925), Vector2(150.85248589267596, 8), 1.7568161828669435)
-    #bordersLayer.addRenderObjectTransformed(Vector2(100, 100), 0, Vector2(0, 0), Vector2(50, 50), ObjType.STATIC_RECT_BORDER)
 
     render()
 
