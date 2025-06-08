@@ -175,14 +175,14 @@ void fragment() {
             borderThickness = 0.;
             d = sdPoweredDecal(vec2(1. - UV.x, 1. - UV.y)) * sizeWithAA.x; //flip horizontally for CCW decal
             break;
-        case TypeNames_UPW_DECAL: //TODO: make right decal
+        case TypeNames_UPW_DECAL:
             borderColor = colorsGlobal[type];
             insideColor = colorsGlobal[type];
             borderThickness = 0.;
             d = sdUnpoweredDecal(vec2(1. - UV.x, UV.y)) * sizeWithAA.x; //flip horizontally for CCW decal
             break;
     }
-    
+
     if(d == inf) { //decals set d separately
         d = sdRoundedRect(pixelPos, size / 2., cornerRadius);
     }

@@ -55,7 +55,7 @@ func setCornerRadii() -> void:
     cornerRadii[ObjType.BUILD_BORDER] = 2
     cornerRadii[ObjType.GOAL_BORDER] = 2
 
-func setShaderCornerRadii() -> void: #TODO: make these accurate
+func setShaderCornerRadii() -> void:
     var shaderCornerRadii: PackedFloat32Array
     shaderCornerRadii.resize(ObjType.size())
     for i in range(ObjType.size()):
@@ -63,7 +63,7 @@ func setShaderCornerRadii() -> void: #TODO: make these accurate
     sm.set_shader_parameter("cornerRadiiGlobal", shaderCornerRadii)
 
 var borderThicknesses: Array[float]
-func setBorderThicknesses() -> void: #TODO: make these accurate
+func setBorderThicknesses() -> void:
     borderThicknesses.resize(ObjType.size())
     borderThicknesses[ObjType.STATIC_RECT_BORDER] = 4; borderThicknesses[ObjType.STATIC_CIRC_BORDER] = 4
     borderThicknesses[ObjType.DYNAMIC_RECT_BORDER] = 4; borderThicknesses[ObjType.DYNAMIC_CIRC_BORDER] = 4
@@ -137,10 +137,10 @@ class RenderLayer extends RefCounted:
     func addRenderObject(size: Vector2, rotation: float, pos: Vector2, center: Vector2, type: ObjType) -> void:
         assert(renderSpot < mmi.multimesh.instance_count, "can't render this many objects")
 
-        sizes[renderSpot] = size
+        sizes[renderSpot] = abs(size)
         rotations[renderSpot] = rotation
         poses[renderSpot] = pos
-        centers[renderSpot] = center
+        centers[renderSpot] = abs(center)
         objTypes[renderSpot] = type
         renderSpot += 1
 
@@ -249,12 +249,20 @@ func setupPieceArrays() -> void:
     setPieceInsides()
     setPieceDecals()
 
+func getRealInsideSize(size: float, borderThickness: float) -> float:
+    return abs(size - 2 * borderThickness)
+
+const ghostRodPadding: float = 1
+func getRealBorderSize(size: float, insideSize: float) -> float:
+    return max(size, insideSize + ghostRodPadding * 2)
+
 func addRoundedRect(size: Vector2, rotation: float, pos: Vector2, type: PieceType, borderLayer: RenderLayer, insideLayer: RenderLayer) -> void:
     var borderType: ObjType = pieceBorders[type]
     var insideType: ObjType = pieceInsides[type]
-    borderLayer.addRenderObjectTransformed(size, rotation, pos, size * 0.5, borderType)
     var borderOffset = Vector2(borderThicknesses[borderType], borderThicknesses[borderType])
-    var insideSize: Vector2 = size - 2 * borderOffset
+    var insideSize: Vector2 = Vector2(getRealInsideSize(size.x, borderOffset.x), getRealInsideSize(size.y, borderOffset.y));
+    var borderSize: Vector2 = Vector2(getRealBorderSize(size.x, insideSize.x), getRealBorderSize(size.y, insideSize.y))
+    borderLayer.addRenderObjectTransformed(borderSize, rotation, pos, borderSize * 0.5, borderType)
     insideLayer.addRenderObjectTransformed(insideSize, rotation, pos, insideSize * 0.5, insideType)
 
 func addRoundedRectPiece(size: Vector2, rotation: float, pos: Vector2, type: PieceType) -> void:
