@@ -34,7 +34,7 @@ enum ObjType {
 #     JOINT_NORMAL_BORDER, JOINT_WHEEL_CENTER_BORDER,
 # }
 
-var sm: ShaderMaterial = load("res://box.tres")
+var sm: ShaderMaterial = load("res://render.tres")
 
 var colors: Array[Color]
 func setColors() -> void:
