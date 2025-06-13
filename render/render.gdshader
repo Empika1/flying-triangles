@@ -90,11 +90,11 @@ instance uniform float aaWidth;
 const int layers = 3;
 instance uniform int layerID;
 
-uniform sampler2D[layers] data;
+uniform sampler2D data;
 
 const float inf = 1. / 0.;
 void fragment() {
-    vec4 idDataF = texelFetch(data[layerID], ivec2(id % 128, id / 128), 0);
+    vec4 idDataF = texelFetch(data, ivec2(id % 128 + layerID * 128, id / 128), 0);
     uvec4 idDataU = uvec4(floatBitsToUint(idDataF[0]), floatBitsToUint(idDataF[1]), floatBitsToUint(idDataF[2]), floatBitsToUint(idDataF[3]));
 
     const uint mask = 0xFFFFFFu;
@@ -179,7 +179,7 @@ void fragment() {
             borderColor = colorsGlobal[type];
             insideColor = colorsGlobal[type];
             borderThickness = 0.;
-            d = sdUnpoweredDecal(vec2(1. - UV.x, UV.y)) * sizeWithAA.x; //flip horizontally for CCW decal
+            d = sdUnpoweredDecal(vec2(1. - UV.x, UV.y)) * sizeWithAA.x;
             break;
     }
 

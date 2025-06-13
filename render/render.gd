@@ -1,6 +1,6 @@
 extends Node
 
-var sm: ShaderMaterial = load("res://render.tres")
+var sm: ShaderMaterial = load("res://render/render.tres")
 
 enum ObjType {
     STATIC_RECT_BORDER, STATIC_RECT_INSIDE,
@@ -147,34 +147,29 @@ class RenderLayer extends RefCounted:
     func resetRenderObjects() -> void:
         renderSpot = 0
 
-    var renderDataImg: Image = Image.create_empty(128, 128, false, Image.FORMAT_RGBAF) #128*128 instances allowed (should be plenty)
-    var renderDataTex: ImageTexture = ImageTexture.create_from_image(renderDataImg)
-    func renderPartial() -> void: #doesn't directly send data to the shaders. outer.render does that.
+    func renderPartial(renderDataImg: Image) -> void: #doesn't directly send data to the shaders. outer.render does that.
         mmi.set_instance_shader_parameter("scale", outer.scale)
         mmi.set_instance_shader_parameter("aaWidth", outer.aaWidth)
         mmi.multimesh.visible_instance_count = renderSpot
+        var aaVec: Vector2 = Vector2(outer.aaWidth, outer.aaWidth) * 2
         for i in range(renderSpot):
             var transform_ := Transform2D()
             transform_ = transform_.rotated_local(rotations[i])
-            transform_ = transform_.scaled_local((sizes[i] + Vector2(outer.aaWidth, outer.aaWidth) * 2) * outer.scale) #added so AA doesn't get cut off
+            transform_ = transform_.scaled_local((sizes[i] + aaVec) * outer.scale) #added so AA doesn't get cut off
             transform_.origin = poses[i] * outer.scale + outer.shift
             mmi.multimesh.set_instance_transform_2d(i, transform_)
 
             var data: Color = outer.packDataToColor(sizes[i] * outer.scale, centers[i] * outer.scale, objTypes[i])
+            #data = Color(float(i) / renderSpot, 0., 0., 1.)
             @warning_ignore("integer_division")
-            renderDataImg.set_pixel(i % 128, i / 128, data)
-        renderDataTex.update(renderDataImg)
+            renderDataImg.set_pixel(i % 128 + layerID * 128, i / 128, data)
 
-@onready var areasLayer: RenderLayer = RenderLayer.new($AreasLayer, 0, self)
-@onready var bordersLayer: RenderLayer = RenderLayer.new($BordersLayer, 1, self)
-@onready var insidesLayer: RenderLayer = RenderLayer.new($InsidesLayer, 2, self)
+@onready var areasLayer: RenderLayer = RenderLayer.new($FTRender/mmAreas, 0, self)
+@onready var bordersLayer: RenderLayer = RenderLayer.new($FTRender/mmBorders, 1, self)
+@onready var insidesLayer: RenderLayer = RenderLayer.new($FTRender/mmInsides, 2, self)
 
-var renderDataTexAll: Array[ImageTexture]
-func setupRenderDataTexAll() -> void:
-    renderDataTexAll.resize(3)
-    renderDataTexAll[0] = areasLayer.renderDataTex
-    renderDataTexAll[1] = bordersLayer.renderDataTex
-    renderDataTexAll[2] = insidesLayer.renderDataTex
+var renderDataImg: Image = Image.create_empty(128 * 3, 128, false, Image.FORMAT_RGBAF)
+var renderDataTex: ImageTexture = ImageTexture.create_from_image(renderDataImg)
 
 func resetRenderObjects() -> void:
     areasLayer.resetRenderObjects()
@@ -182,10 +177,11 @@ func resetRenderObjects() -> void:
     insidesLayer.resetRenderObjects()
 
 func render() -> void:
-    areasLayer.renderPartial()
-    bordersLayer.renderPartial()
-    insidesLayer.renderPartial()
-    sm.set_shader_parameter("data", renderDataTexAll)
+    areasLayer.renderPartial(renderDataImg)
+    bordersLayer.renderPartial(renderDataImg)
+    insidesLayer.renderPartial(renderDataImg)
+    renderDataTex.update(renderDataImg)
+    sm.set_shader_parameter("data", renderDataTex)
 
 #TODO: make this good
 const aaWidth: float = 0.5
@@ -356,11 +352,8 @@ func addBuildArea(pos: Vector2, size: Vector2, rotation: float) -> void:
 func addGoalArea(pos: Vector2, size: Vector2, rotation: float) -> void:
     addArea(size, rotation, pos, PieceType.GOAL)
 
-var renderDataImg: Image = Image.create_empty(128, 128, false, Image.FORMAT_RGBAF)
-var renderDataTxt: ImageTexture = ImageTexture.create_from_image(renderDataImg)
 func _ready() -> void:
     setupVisuals()
-    setupRenderDataTexAll()
     setupPieceArrays()
 
 func _process(_delta: float) -> void:
