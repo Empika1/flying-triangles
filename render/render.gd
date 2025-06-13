@@ -37,13 +37,6 @@ func setColors() -> void:
     colors[ObjType.GOAL_BORDER] = Color("#bb6666"); colors[ObjType.GOAL_INSIDE] = Color("#f19191")
     colors[ObjType.JOINT_NORMAL] = Color("#838383"); colors[ObjType.JOINT_WHEEL_CENTER] = Color("#ffffff");
 
-func setShaderColors() -> void:
-    var shaderColors: PackedVector4Array
-    shaderColors.resize(ObjType.size())
-    for i in range(ObjType.size()):
-        shaderColors[i] = Vector4(colors[i][0], colors[i][1], colors[i][2], colors[i][3])
-    sm.set_shader_parameter("colorsGlobal", shaderColors)
-
 var cornerRadii: Array[float]
 func setCornerRadii() -> void:
     cornerRadii.resize(ObjType.size())
@@ -54,13 +47,6 @@ func setCornerRadii() -> void:
     cornerRadii[ObjType.WATER_BORDER] = 2
     cornerRadii[ObjType.BUILD_BORDER] = 2
     cornerRadii[ObjType.GOAL_BORDER] = 2
-
-func setShaderCornerRadii() -> void:
-    var shaderCornerRadii: PackedFloat32Array
-    shaderCornerRadii.resize(ObjType.size())
-    for i in range(ObjType.size()):
-        shaderCornerRadii[i] = cornerRadii[i]
-    sm.set_shader_parameter("cornerRadiiGlobal", shaderCornerRadii)
 
 var borderThicknesses: Array[float]
 func setBorderThicknesses() -> void:
@@ -74,20 +60,34 @@ func setBorderThicknesses() -> void:
     borderThicknesses[ObjType.CW_BORDER] = 4; borderThicknesses[ObjType.CCW_BORDER] = 4; borderThicknesses[ObjType.UPW_BORDER] = 4;
     borderThicknesses[ObjType.JOINT_NORMAL] = 2; borderThicknesses[ObjType.JOINT_WHEEL_CENTER] = 2
 
-func setShaderBorderThicknesses() -> void:
-    var shaderBorderThicknesses: PackedFloat32Array
-    shaderBorderThicknesses.resize(ObjType.size())
-    for i in range(ObjType.size()):
-        shaderBorderThicknesses[i] = borderThicknesses[i]
-    sm.set_shader_parameter("borderThicknessesGlobal", shaderBorderThicknesses)
+var isCircles: Array[float]
+func setIsCircles() -> void:
+    isCircles.resize(ObjType.size())
+    isCircles[ObjType.STATIC_CIRC_BORDER] = true; isCircles[ObjType.STATIC_CIRC_INSIDE] = true
+    isCircles[ObjType.DYNAMIC_CIRC_BORDER] = true; isCircles[ObjType.DYNAMIC_CIRC_INSIDE] = true
+    isCircles[ObjType.GP_CIRC_BORDER] = true; isCircles[ObjType.GP_CIRC_INSIDE] = true
+    isCircles[ObjType.CW_BORDER] = true; isCircles[ObjType.CW_INSIDE] = true; isCircles[ObjType.CW_DECAL] = true
+    isCircles[ObjType.CCW_BORDER] = true; isCircles[ObjType.CCW_INSIDE] = true; isCircles[ObjType.CCW_DECAL] = true
+    isCircles[ObjType.UPW_BORDER] = true; isCircles[ObjType.UPW_INSIDE] = true; isCircles[ObjType.UPW_DECAL] = true
+    isCircles[ObjType.JOINT_NORMAL] = true; isCircles[ObjType.JOINT_WHEEL_CENTER] = true
+
+enum SdfType {
+    ROUNDED_RECT, CW, CCW, UPW
+}
+
+var sdfTypes: Array[SdfType]
+func setSdfTypes() -> void:
+    sdfTypes.resize(ObjType.size())
+    sdfTypes[ObjType.CW_DECAL] = SdfType.CW
+    sdfTypes[ObjType.CCW_DECAL] = SdfType.CCW
+    sdfTypes[ObjType.UPW_DECAL] = SdfType.UPW
 
 func setupVisuals() -> void:
     setColors()
-    setShaderColors()
     setCornerRadii()
-    setShaderCornerRadii()
     setBorderThicknesses()
-    setShaderBorderThicknesses()
+    setIsCircles()
+    setSdfTypes()
 
 var uintBitsToFloat_Bytes: PackedByteArray = (func():
     var bytes: PackedByteArray
@@ -99,17 +99,54 @@ func uintBitsToFloat(data: int) -> float: #32 bit uint to 32 bit float
     return uintBitsToFloat_Bytes.decode_float(0)
 
 # data layout:
-# size: 48 bytes as fixed point | center: 48 bytes as fixed point | type: 32 bytes as enum (lol)
-func packDataToColor(size: Vector2, center: Vector2, type: ObjType) -> Color:
-    var sizeU: Vector2i = Vector2i(int(size.x * 16), int(size.y * 16)) #stored to the precision of 1/16 of a pixel. stores in the range [0, (2 ** 20 - 1) / 16]
-    var centerU: Vector2i = Vector2i(int(center.x * 16), int(center.y * 16)) #ditto
-    var int1: int = sizeU.x << 8 | sizeU.y >> 16
-    var int2: int = sizeU.y << 16 | centerU.x >> 8
-    var int3: int = centerU.x << 24 | centerU.y
-    var int4: int = int(type)
-    return Color(uintBitsToFloat(int1), uintBitsToFloat(int2), uintBitsToFloat(int3), uintBitsToFloat(int4));
+# color: 40 bits as fixed point (10 bits per channel)
+# size: 48 bits as fixed point (24 per coord)
+# corner radius: 19 bits as fixed point
+# border thickness: 19 bits as fixed point
+# SDF used: 2 bits
+# size, radius, and thickness all stored to the precision of 1/8th of a pixel
+func packDataToColor(color: Color, size: Vector2, cornerRadius: float, borderThickness: float, sdfType: int) -> Color:
+    # Quantize RGBA to 10 bits each (0–1023)
+    var r = int(clamp(color.r * 1024.0, 0, 1023))
+    var g = int(clamp(color.g * 1024.0, 0, 1023))
+    var b = int(clamp(color.b * 1024.0, 0, 1023))
+    var a = int(clamp(color.a * 1024.0, 0, 1023))
 
-#render data
+    # Quantize size to 24 bits per component (×8 precision)
+    var sizeU = Vector2i(int(clamp(size.x * 8, 0, 0xFFFFFF))
+            , int(clamp(size.y * 8, 0, 0xFFFFFF)))
+
+    # Quantize radius and thickness to 19 bits each
+    var radius_bits = int(clamp(cornerRadius * 8, 0, 0x7FFFF))
+    var thickness_bits = int(clamp(borderThickness * 8, 0, 0x7FFFF))
+
+    # SDF type: 2 bits
+    var sdf_bits = sdfType & 0x3
+
+    # ---- Packing across 4 x 32-bit ints ----
+
+    # int1: high 32 bits of color (R+G+B part)
+    var int1 = (r << 22) | (g << 12) | (b << 2) | (a >> 8)
+
+    # int2: low 8 bits of color + high 24 bits of sizeU.x
+    var int2 = (a << 24) | (sizeU.x >> 0)
+
+    # int3: sizeU.y (24 bits) + high 8 bits of radius
+    var int3 = (sizeU.y << 8) | (radius_bits >> 11)
+
+    # int4: low 11 bits of radius + 19 bits of thickness + 2 bits of sdf
+    var int4 = (radius_bits << 21) | (thickness_bits << 2) | (sdf_bits & 0x3)
+
+    return Color(
+        uintBitsToFloat(int1),
+        uintBitsToFloat(int2),
+        uintBitsToFloat(int3),
+        uintBitsToFloat(int4)
+    )
+
+const dataLayerSize: Vector2i = Vector2i(128, 128)
+
+#render dataAA_WI
 class RenderLayer extends RefCounted:
     var outer
 
@@ -117,7 +154,6 @@ class RenderLayer extends RefCounted:
     var sizes: Array[Vector2]
     var rotations: Array[float]
     var poses: Array[Vector2]
-    var centers: Array[Vector2]
     var objTypes: Array[ObjType]
     var layerID: int
 
@@ -129,18 +165,16 @@ class RenderLayer extends RefCounted:
         sizes.resize(count)
         rotations.resize(count)
         poses.resize(count)
-        centers.resize(count)
         objTypes.resize(count)
         mmi.set_instance_shader_parameter("layerID", layerID)
 
     var renderSpot: int = 0
-    func addRenderObject(size: Vector2, rotation: float, pos: Vector2, center: Vector2, type: ObjType) -> void:
+    func addRenderObject(size: Vector2, rotation: float, pos: Vector2, type: ObjType) -> void:
         assert(renderSpot < mmi.multimesh.instance_count, "can't render this many objects")
 
         sizes[renderSpot] = abs(size)
         rotations[renderSpot] = rotation
         poses[renderSpot] = pos
-        centers[renderSpot] = abs(center)
         objTypes[renderSpot] = type
         renderSpot += 1
 
@@ -148,7 +182,6 @@ class RenderLayer extends RefCounted:
         renderSpot = 0
 
     func renderPartial(renderDataImg: Image) -> void: #doesn't directly send data to the shaders. outer.render does that.
-        mmi.set_instance_shader_parameter("scale", outer.scale)
         mmi.set_instance_shader_parameter("aaWidth", outer.aaWidth)
         mmi.multimesh.visible_instance_count = renderSpot
         var aaVec: Vector2 = Vector2(outer.aaWidth, outer.aaWidth) * 2
@@ -159,16 +192,22 @@ class RenderLayer extends RefCounted:
             transform_.origin = poses[i] * outer.scale + outer.shift
             mmi.multimesh.set_instance_transform_2d(i, transform_)
 
-            var data: Color = outer.packDataToColor(sizes[i] * outer.scale, centers[i] * outer.scale, objTypes[i])
+            var type: ObjType = objTypes[i]
+            var color: Color = outer.colors[type]
+            var size: Vector2 = sizes[i] * outer.scale
+            var cornerRadius: float = outer.cornerRadii[type] * outer.scale if !outer.isCircles[type] else size.x * 0.5
+            var borderThickness: float = outer.borderThicknesses[type] * outer.scale if type == ObjType.JOINT_NORMAL || type == ObjType.JOINT_WHEEL_CENTER else INF
+            var sdfType: int = outer.sdfTypes[type]
+            var data: Color = outer.packDataToColor(color, size, cornerRadius, borderThickness, sdfType)
             #data = Color(float(i) / renderSpot, 0., 0., 1.)
             @warning_ignore("integer_division")
-            renderDataImg.set_pixel(i % 128 + layerID * 128, i / 128, data)
+            renderDataImg.set_pixel(i % dataLayerSize.x + layerID * dataLayerSize.x, i / dataLayerSize.y, data)
 
 @onready var areasLayer: RenderLayer = RenderLayer.new($FTRender/mmAreas, 0, self)
 @onready var bordersLayer: RenderLayer = RenderLayer.new($FTRender/mmBorders, 1, self)
 @onready var insidesLayer: RenderLayer = RenderLayer.new($FTRender/mmInsides, 2, self)
 
-var renderDataImg: Image = Image.create_empty(128 * 3, 128, false, Image.FORMAT_RGBAF)
+var renderDataImg: Image = Image.create_empty(dataLayerSize.x * 3, dataLayerSize.y, false, Image.FORMAT_RGBAF)
 var renderDataTex: ImageTexture = ImageTexture.create_from_image(renderDataImg)
 
 func resetRenderObjects() -> void:
@@ -181,6 +220,7 @@ func render() -> void:
     bordersLayer.renderPartial(renderDataImg)
     insidesLayer.renderPartial(renderDataImg)
     renderDataTex.update(renderDataImg)
+    sm.set_shader_parameter("dataLayerSize", dataLayerSize)
     sm.set_shader_parameter("data", renderDataTex)
 
 #TODO: make this good
@@ -255,8 +295,8 @@ func addRoundedRect(size: Vector2, rotation: float, pos: Vector2, type: PieceTyp
     var borderOffset = Vector2(borderThicknesses[borderType], borderThicknesses[borderType])
     var insideSize: Vector2 = Vector2(getRealInsideSize(size.x, borderOffset.x), getRealInsideSize(size.y, borderOffset.y));
     var borderSize: Vector2 = Vector2(getRealBorderSize(size.x, insideSize.x), getRealBorderSize(size.y, insideSize.y))
-    borderLayer.addRenderObject(borderSize, rotation, pos, borderSize * 0.5, borderType)
-    insideLayer.addRenderObject(insideSize, rotation, pos, insideSize * 0.5, insideType)
+    borderLayer.addRenderObject(borderSize, rotation, pos, borderType)
+    insideLayer.addRenderObject(insideSize, rotation, pos, insideType)
 
 func addRoundedRectPiece(size: Vector2, rotation: float, pos: Vector2, type: PieceType) -> void:
     addRoundedRect(size, rotation, pos, type, bordersLayer, insidesLayer)
@@ -269,8 +309,7 @@ func addCirclePiece(radius: float, rotation: float, pos: Vector2, type: PieceTyp
 
 const jointRadius: float = 4
 func addJoint(pos: Vector2, rotation: float, type: ObjType) -> void:
-    var size: Vector2 = Vector2(jointRadius, jointRadius) * 2
-    insidesLayer.addRenderObject(Vector2(jointRadius, jointRadius) * 2, rotation, pos, size * 0.5, type)
+    insidesLayer.addRenderObject(Vector2(jointRadius, jointRadius) * 2, rotation, pos, type)
 
 func addJointedRod(size: Vector2, rotation: float, pos: Vector2, type: PieceType) -> void:
     addRoundedRectPiece(size, rotation, pos, type)
@@ -300,7 +339,7 @@ func addDecalCircle(radius: float, rotation: float, pos: Vector2, type: PieceTyp
     var borderType: ObjType = pieceBorders[type]
     var borderOffset = Vector2(borderThicknesses[borderType], borderThicknesses[borderType])
     var insideSize: Vector2 = size - 2 * borderOffset
-    insidesLayer.addRenderObject(insideSize, rotation, pos, insideSize * 0.5, pieceDecals[type]) #maybe make this a seperate function if i ever wanna add just a decal
+    insidesLayer.addRenderObject(insideSize, rotation, pos, pieceDecals[type]) #maybe make this a seperate function if i ever wanna add just a decal
     addCircleJoints(radius, rotation, pos)
 
 func addStaticRect(pos: Vector2, size: Vector2, rotation: float) -> void:

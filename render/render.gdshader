@@ -65,129 +65,74 @@ void vertex() {
     id = INSTANCE_ID;
 }
 
-const int TypeNames_STATIC_RECT_BORDER = 0, TypeNames_STATIC_RECT_INSIDE = 1;
-const int TypeNames_STATIC_CIRC_BORDER = 2, TypeNames_STATIC_CIRC_INSIDE = 3;
-const int TypeNames_DYNAMIC_RECT_BORDER = 4, TypeNames_DYNAMIC_RECT_INSIDE = 5;
-const int TypeNames_DYNAMIC_CIRC_BORDER = 6, TypeNames_DYNAMIC_CIRC_INSIDE = 7;
-const int TypeNames_GP_RECT_BORDER = 8, TypeNames_GP_RECT_INSIDE = 9;
-const int TypeNames_GP_CIRC_BORDER = 10, TypeNames_GP_CIRC_INSIDE = 11;
-const int TypeNames_WOOD_BORDER = 12, TypeNames_WOOD_INSIDE = 13;
-const int TypeNames_WATER_BORDER = 14, TypeNames_WATER_INSIDE = 15;
-const int TypeNames_CW_BORDER = 16, TypeNames_CW_INSIDE = 17, TypeNames_CW_DECAL = 18;
-const int TypeNames_CCW_BORDER = 19, TypeNames_CCW_INSIDE = 20, TypeNames_CCW_DECAL = 21;
-const int TypeNames_UPW_BORDER = 22, TypeNames_UPW_INSIDE = 23, TypeNames_UPW_DECAL = 24;
-const int TypeNames_BUILD_BORDER = 25, TypeNames_BUILD_INSIDE = 26;
-const int TypeNames_GOAL_BORDER = 27, TypeNames_GOAL_INSIDE = 28;
-const int TypeNames_JOINT_NORMAL = 29, TypeNames_JOINT_WHEEL_CENTER = 30;
-const int TypeNames_SIZE = 31;
+const uint SDF_CW = 1u;
+const uint SDF_CCW = 2u;
+const uint SDF_UPW = 3u;
 
-uniform vec4[TypeNames_SIZE] colorsGlobal;
-uniform float[TypeNames_SIZE] cornerRadiiGlobal;
-uniform float[TypeNames_SIZE] borderThicknessesGlobal; //TODO: figure out if this is needed
-
-instance uniform float scale;
 instance uniform float aaWidth;
-const int layers = 3;
 instance uniform int layerID;
 
 uniform sampler2D data;
+uniform ivec2 dataLayerSize;
 
-const float inf = 1. / 0.;
 void fragment() {
-    vec4 idDataF = texelFetch(data, ivec2(id % 128 + layerID * 128, id / 128), 0);
-    uvec4 idDataU = uvec4(floatBitsToUint(idDataF[0]), floatBitsToUint(idDataF[1]), floatBitsToUint(idDataF[2]), floatBitsToUint(idDataF[3]));
+    vec4 packed = texelFetch(data, ivec2(id % dataLayerSize.x + layerID * dataLayerSize.x, id / dataLayerSize.y), 0);
 
-    const uint mask = 0xFFFFFFu;
-    uvec2 sizeU = uvec2(idDataU[0] >> 8u, (idDataU[0] << 16u | idDataU[1] >> 16u) & mask);
-    uvec2 centerU = uvec2((idDataU[1] << 8u | idDataU[2] >> 24u) & mask, idDataU[2] & mask);
-    vec2 size = vec2(float(sizeU.x) / 16., float(sizeU.y) / 16.);
-    vec2 center = vec2(float(centerU.x) / 16., float(centerU.y) / 16.);
-    int type = int(idDataU[3]);
+    // Step 1: Retrieve the raw 32-bit integers
+    uint int1 = floatBitsToUint(packed.r);
+    uint int2 = floatBitsToUint(packed.g);
+    uint int3 = floatBitsToUint(packed.b);
+    uint int4 = floatBitsToUint(packed.a);
+
+    // Step 2: Rebuild 40-bit color from int1 and int2
+    uint color_bits = (int1 << 8u) | (int2 >> 24u);
+
+    uint r10 = (int1 >> 22u) & 0x3FFu;
+    uint g10 = (int1 >> 12u) & 0x3FFu;
+    uint b10 = (int1 >> 2u) & 0x3FFu;
+    uint a10 = ((int1 << 8u) | (int2 >> 24u)) & 0x3FFu;
+
+    vec4 color = vec4(float(r10) / 1024., float(g10) / 1024., float(b10) / 1024., float(a10) / 1024.);
+
+    uint size_x = int2 & 0xFFFFFFu;
+    uint size_y = (int3 >> 8u) & 0xFFFFFFu;
+    vec2 size = vec2(float(size_x), float(size_y)) / 8.0;
+
+    uint radius = ((int3 << 11u) | (int4 >> 21u)) & 0x7FFFFu;
+    float corner_radius = float(radius) / 8.0;
+
+    uint thickness = (int4 >> 2u) & 0x7FFFFu;
+    float border_thickness = float(thickness) / 8.0;
+
+    uint sdf_type = int4 & 0x3u;
 
     const vec4 outsideColor = vec4(0.);
-    vec4 borderColor;
-    vec4 insideColor;
-    float cornerRadius;
-    float borderThickness;
+    vec4 borderColor = color;
+    const vec4 insideColor = vec4(0.);
+    float cornerRadius = corner_radius;
+    float borderThickness = border_thickness;
+    vec2 center = size * 0.5;
 
     vec2 sizeWithAA = size + vec2(aaWidth) * 2.;
     vec2 pixelPos = UV * sizeWithAA - vec2(aaWidth) - center;
-    float d = inf;
+    float d;
 
-    switch(type) {
-        case TypeNames_STATIC_RECT_BORDER: //rect borders
-        case TypeNames_DYNAMIC_RECT_BORDER:
-        case TypeNames_GP_RECT_BORDER:
-        case TypeNames_WOOD_BORDER:
-        case TypeNames_WATER_BORDER:
-        case TypeNames_BUILD_BORDER:
-        case TypeNames_GOAL_BORDER:
-            borderColor = colorsGlobal[type];
-            insideColor = borderColor;
-            cornerRadius = cornerRadiiGlobal[type] * scale;
-            borderThickness = 0.;
-            break;
-        case TypeNames_STATIC_RECT_INSIDE: //rect insides
-        case TypeNames_DYNAMIC_RECT_INSIDE:
-        case TypeNames_GP_RECT_INSIDE:
-        case TypeNames_WOOD_INSIDE:
-        case TypeNames_WATER_INSIDE:
-        case TypeNames_BUILD_INSIDE:
-        case TypeNames_GOAL_INSIDE:
-            borderColor = colorsGlobal[type];
-            insideColor = borderColor;
-            cornerRadius = 0.;
-            borderThickness = 0.;
-            break;
-        case TypeNames_STATIC_CIRC_BORDER: //filled circles
-        case TypeNames_STATIC_CIRC_INSIDE:
-        case TypeNames_DYNAMIC_CIRC_BORDER:
-        case TypeNames_DYNAMIC_CIRC_INSIDE:
-        case TypeNames_GP_CIRC_BORDER:
-        case TypeNames_GP_CIRC_INSIDE:
-        case TypeNames_CW_BORDER:
-        case TypeNames_CW_INSIDE:
-        case TypeNames_CCW_BORDER:
-        case TypeNames_CCW_INSIDE:
-        case TypeNames_UPW_BORDER:
-        case TypeNames_UPW_INSIDE:
-            borderColor = colorsGlobal[type];
-            insideColor = borderColor;
-            cornerRadius = size.x / 2.; //should be equal to size.y because this is a circle
-            borderThickness = 0.;
-            break;
-        case TypeNames_JOINT_NORMAL: //hollow circles
-        case TypeNames_JOINT_WHEEL_CENTER:
-            borderColor = colorsGlobal[type];
-            insideColor = vec4(0.);
-            cornerRadius = size.x / 2.; //should be equal to size.y because this is a circle
-            borderThickness = borderThicknessesGlobal[type] * scale;
-            break;
-        case TypeNames_CW_DECAL: //wheel decals (all handled individually) TODO: figure out why decals make an ugly square at very high AA value
-            borderColor = colorsGlobal[type];
-            insideColor = colorsGlobal[type];
-            borderThickness = 0.;
+    switch(sdf_type) {
+        case SDF_CW:
             d = sdPoweredDecal(vec2(UV.x, 1. - UV.y)) * sizeWithAA.x; //decal SDF assumed fixed size
             break;
-        case TypeNames_CCW_DECAL:
-            borderColor = colorsGlobal[type];
-            insideColor = colorsGlobal[type];
-            borderThickness = 0.;
+        case SDF_CCW:
             d = sdPoweredDecal(vec2(1. - UV.x, 1. - UV.y)) * sizeWithAA.x; //flip horizontally for CCW decal
             break;
-        case TypeNames_UPW_DECAL:
-            borderColor = colorsGlobal[type];
-            insideColor = colorsGlobal[type];
-            borderThickness = 0.;
+        case SDF_UPW:
             d = sdUnpoweredDecal(vec2(1. - UV.x, UV.y)) * sizeWithAA.x;
+            break;
+        default:
+            d = sdRoundedRect(pixelPos, size / 2., cornerRadius);
             break;
     }
 
-    if(d == inf) { //decals set d separately
-        d = sdRoundedRect(pixelPos, size / 2., cornerRadius);
-    }
-
-    float outsideA = clamp((d + aaWidth) / (2. * aaWidth),  0.0, 1.0);
+    float outsideA = clamp((d + aaWidth) / (2. * aaWidth), 0.0, 1.0);
     float insideA  = clamp(1.0 - (d + borderThickness + aaWidth) / (2. * aaWidth), 0.0, 1.0);
     float borderA  = clamp(1.0 - outsideA - insideA, 0.0, 1.0);
 

@@ -1,6 +1,6 @@
 [gd_scene load_steps=7 format=3 uid="uid://cn4n73u4r8y2v"]
 
-[ext_resource type="Script" uid="uid://00k6cb311vdg" path="res://render/controller.gd" id="1_h2yge"]
+[ext_resource type="Script" uid="uid://cj8kwegfsito1" path="res://render/render.gd" id="1_h2yge"]
 [ext_resource type="Material" uid="uid://c7pyjdqr3nu18" path="res://render/render.tres" id="2_h2yge"]
 [ext_resource type="QuadMesh" uid="uid://befpwqu6qr7xj" path="res://render/mesh.tres" id="3_1bvp3"]
 
@@ -22,7 +22,7 @@ buffer = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 [node name="Node" type="Node"]
 script = ExtResource("1_h2yge")
 
-[node name="FTRender" type="FTRender" parent="."]
+[node name="FTRender" type="Node" parent="."]
 
 [node name="mmAreas" type="MultiMeshInstance2D" parent="FTRender"]
 material = ExtResource("2_h2yge")
