@@ -1,24 +1,21 @@
-[gd_resource type="ShaderMaterial" load_steps=5 format=3 uid="uid://bjy68dbo14tya"]
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://bjy68dbo14tya"]
 
 [ext_resource type="Shader" uid="uid://bl1flagc88q33" path="res://render/frosted.gdshader" id="1_4w21w"]
 
-[sub_resource type="Gradient" id="Gradient_4w21w"]
-colors = PackedColorArray(0.366595, 0.366595, 0.366595, 1, 0.593134, 0.593134, 0.593133, 1)
-
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_4w21w"]
-frequency = 0.2988
+frequency = 0.5
 fractal_type = 0
 fractal_octaves = 1
 fractal_gain = 0.38
 
 [sub_resource type="NoiseTexture2D" id="NoiseTexture2D_ed6a7"]
 seamless = true
-color_ramp = SubResource("Gradient_4w21w")
+as_normal_map = true
 noise = SubResource("FastNoiseLite_4w21w")
 
 [resource]
 shader = ExtResource("1_4w21w")
 shader_parameter/frosted_texture = SubResource("NoiseTexture2D_ed6a7")
 shader_parameter/lod_level = 4
-shader_parameter/brightness = 0.84
-shader_parameter/distortion_intensity = 0.006
+shader_parameter/brightness = 1.0
+shader_parameter/distortion_intensity = 0.0

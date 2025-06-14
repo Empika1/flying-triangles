@@ -1,4 +1,5 @@
 shader_type canvas_item;
+render_mode blend_premul_alpha;
 
 uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap; // Captures the screen texture
 uniform sampler2D frosted_texture : source_color, repeat_enable; // Your frosted glass texture for distortion
@@ -84,7 +85,7 @@ void fragment() {
     if(this_color.a == 0.) {
         COLOR.rgb = texture(screen_texture, SCREEN_UV).rgb;
     } else {
-        COLOR.rgb = mix(adjusted_color, this_color.rgb, this_color.a);
+        COLOR.rgb = mix(mix(texture(screen_texture, SCREEN_UV).rgb, adjusted_color, clamp(this_color.a * 5., 0., 1.)), this_color.rgb / this_color.a, this_color.a);
     }
     COLOR.a = 1.;
     // Optional: Preserve the original alpha of the blurred screen texture

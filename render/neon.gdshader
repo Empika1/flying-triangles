@@ -1,4 +1,5 @@
 shader_type canvas_item;
+render_mode blend_premul_alpha;
 
 uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap; // Captures the screen texture
 uniform sampler2D frosted_texture : source_color, repeat_enable; // Your frosted glass texture for distortion
