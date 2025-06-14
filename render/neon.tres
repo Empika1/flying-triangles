@@ -1,0 +1,12 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://xbnb332flak4"]
+
+[ext_resource type="Shader" uid="uid://h762lwt8u0yn" path="res://render/neon.gdshader" id="1_4w21w"]
+
+[resource]
+shader = ExtResource("1_4w21w")
+shader_parameter/lod_level = 5
+shader_parameter/blur_brightness = 1.35
+shader_parameter/base_brightness = 1.5
+shader_parameter/blur_saturation = 1.0
+shader_parameter/base_saturation = 0.3
+shader_parameter/distortion_intensity = 0.0
